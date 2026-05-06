@@ -1,0 +1,857 @@
+# Professional Trading Platform - Architecture & Flowcharts
+
+This document provides visual representations of the system architecture, data flows, and key processes in the Professional Trading Platform.
+
+---
+
+## Table of Contents
+1. [System Architecture Overview](#system-architecture-overview)
+2. [Application Startup Flow](#application-startup-flow)
+3. [Data Fetching Flow](#data-fetching-flow)
+4. [Technical Analysis Pipeline](#technical-analysis-pipeline)
+5. [Trading Signals Generation](#trading-signals-generation)
+6. [Sentiment Analysis Workflow](#sentiment-analysis-workflow)
+7. [Risk Metrics Calculation](#risk-metrics-calculation)
+8. [Stock Comparison Process](#stock-comparison-process)
+9. [Stock Screener Flow](#stock-screener-flow)
+10. [User Interaction Flow](#user-interaction-flow)
+
+---
+
+## 1. System Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    PROFESSIONAL TRADING PLATFORM                 │
+│                         (Streamlit App)                          │
+└─────────────────────────────────────────────────────────────────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    │                         │
+            ┌───────▼────────┐       ┌───────▼────────┐
+            │   Frontend UI   │       │  Backend Logic │
+            │   (Streamlit)   │       │    (Python)    │
+            └───────┬────────┘       └───────┬────────┘
+                    │                         │
+        ┌───────────┼─────────────────────────┼──────────┐
+        │           │                         │          │
+   ┌────▼────┐ ┌───▼────┐ ┌──────────┐ ┌────▼─────┐ ┌──▼────┐
+   │ Sidebar │ │  Tabs  │ │  Charts  │ │ Analysis │ │ Cache │
+   │Controls │ │(10 Tabs)│ │ (Plotly) │ │ Engines  │ │System │
+   └────┬────┘ └───┬────┘ └────┬─────┘ └────┬─────┘ └──┬────┘
+        │          │            │            │          │
+        └──────────┴────────────┴────────────┴──────────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    │                         │
+            ┌───────▼────────┐       ┌───────▼────────┐
+            │  Data Sources   │       │   Libraries    │
+            └────────────────┘       └────────────────┘
+                    │                         │
+        ┌───────────┼─────────────┬──────────┼──────────┐
+        │           │             │          │          │
+   ┌────▼────┐ ┌───▼────┐ ┌─────▼─────┐ ┌──▼──────┐ ┌─▼─────┐
+   │ Yahoo   │ │NewsAPI │ │  Sector   │ │pandas-ta│ │ VADER │
+   │ Finance │ │        │ │   ETFs    │ │         │ │Sentiment│
+   └─────────┘ └────────┘ └───────────┘ └─────────┘ └───────┘
+```
+
+---
+
+## 2. Application Startup Flow
+
+```
+START
+  │
+  ├─► Load Python Libraries
+  │   ├─► streamlit
+  │   ├─► pandas, numpy
+  │   ├─► yfinance
+  │   ├─► plotly
+  │   └─► Optional: quantstats, pandas-ta, newsapi
+  │
+  ├─► Check Library Availability
+  │   ├─► QUANTSTATS_AVAILABLE? → Show warning if missing
+  │   ├─► PANDAS_TA_AVAILABLE? → Show warning if missing
+  │   └─► NEWS_AVAILABLE? → Disable sentiment if missing
+  │
+  ├─► Configure Streamlit Page
+  │   ├─► Set page title: "Professional Trading Platform"
+  │   ├─► Set layout: "wide"
+  │   ├─► Set icon: 📊
+  │   └─► Expand sidebar by default
+  │
+  ├─► Apply Custom CSS Styling
+  │   ├─► Dark theme colors
+  │   ├─► Professional gradients
+  │   ├─► Tab styling
+  │   └─► Button/metric card styles
+  │
+  ├─► Render Header
+  │   ├─► Main title with gradient
+  │   └─► Subtitle
+  │
+  ├─► Build Sidebar Controls
+  │   ├─► Stock symbol input (default: MSFT)
+  │   ├─► Popular symbols expander
+  │   ├─► Timeframe selection (Period + Interval)
+  │   ├─► Analysis options checkboxes
+  │   └─► Disclaimer captions
+  │
+  ├─► Validate Interval/Period Combination
+  │   └─► Show warnings for intraday data limits
+  │
+  └─► Call main() Function
+      └─► Continue to Data Fetching Flow
+```
+
+---
+
+## 3. Data Fetching Flow
+
+```
+User Selects Stock Symbol (e.g., "AAPL")
+  │
+  ├─► Validate Symbol Input
+  │   └─► Is symbol empty? → Show warning & return
+  │
+  ├─► Display Loading Spinner
+  │   └─► "📥 Fetching {symbol} data..."
+  │
+  ├─► Call fetch_professional_data(symbol, period, interval)
+  │   │
+  │   ├─► Method 1: Try yf.download()
+  │   │   ├─► Download data with auto_adjust=True
+  │   │   ├─► Flatten multi-index columns if present
+  │   │   └─► Success? → Continue
+  │   │
+  │   ├─► Method 2: Fallback to yf.Ticker()
+  │   │   ├─► Create Ticker object
+  │   │   ├─► Call ticker.history()
+  │   │   └─► Success? → Continue
+  │   │
+  │   ├─► Fetch Company Info
+  │   │   ├─► Get ticker.info dictionary
+  │   │   ├─► Extract: name, sector, marketCap, PE, beta, etc.
+  │   │   └─► Handle missing fields with defaults
+  │   │
+  │   └─► Return (DataFrame, company_info)
+  │
+  ├─► Check Data Validity
+  │   ├─► Is DataFrame None or empty?
+  │   │   └─► YES → Show error & return
+  │   └─► NO → Continue
+  │
+  ├─► Display Success Message
+  │   └─► "✅ Loaded {n} data points for {company_name}"
+  │
+  ├─► Calculate Technical Indicators
+  │   └─► Continue to Technical Analysis Pipeline
+  │
+  └─► Display Company Info Bar
+      ├─► Current Price & Change %
+      ├─► Market Cap
+      ├─► P/E Ratio
+      ├─► Beta
+      ├─► 52-Week High
+      └─► 52-Week Low
+```
+
+---
+
+## 4. Technical Analysis Pipeline
+
+```
+Input: Raw OHLCV DataFrame
+  │
+  ├─► Check pandas-ta Availability
+  │   │
+  │   ├─► AVAILABLE → Use pandas-ta for all indicators
+  │   │   │
+  │   │   ├─► Trend Indicators
+  │   │   │   ├─► SMA (20, 50, 200)
+  │   │   │   ├─► EMA (12, 26)
+  │   │   │   └─► VWAP
+  │   │   │
+  │   │   ├─► Momentum Indicators
+  │   │   │   ├─► RSI (14)
+  │   │   │   ├─► MACD (12, 26, 9)
+  │   │   │   └─► Stochastic Oscillator
+  │   │   │
+  │   │   ├─► Volatility Indicators
+  │   │   │   ├─► Bollinger Bands (20, 2)
+  │   │   │   └─► ATR (14)
+  │   │   │
+  │   │   └─► Volume Indicators
+  │   │       └─► OBV (On-Balance Volume)
+  │   │
+  │   └─► NOT AVAILABLE → Use manual calculations
+  │       ├─► SMA using rolling().mean()
+  │       ├─► EMA using ewm().mean()
+  │       ├─► RSI manual calculation
+  │       ├─► MACD manual calculation
+  │       └─► Bollinger Bands manual calculation
+  │
+  ├─► Add Calculated Columns to DataFrame
+  │   └─► df['SMA_20'], df['RSI'], df['MACD_12_26_9'], etc.
+  │
+  ├─► Handle Calculation Errors
+  │   └─► Try-except wrapper → Return original df on error
+  │
+  └─► Return Enhanced DataFrame
+      └─► Ready for charting and signal generation
+```
+
+---
+
+## 5. Trading Signals Generation
+
+```
+Input: DataFrame with Technical Indicators
+  │
+  ├─► Initialize Empty Signals List
+  │
+  ├─► TREND ANALYSIS (5 signals)
+  │   ├─► Check SMA alignment
+  │   │   ├─► Price > SMA50 > SMA200? → "STRONG UPTREND"
+  │   │   └─► Price < SMA50 < SMA200? → "STRONG DOWNTREND"
+  │   │
+  │   ├─► Check Golden/Death Cross
+  │   │   ├─► SMA50 crossed above SMA200? → "GOLDEN CROSS"
+  │   │   └─► SMA50 crossed below SMA200? → "DEATH CROSS"
+  │   │
+  │   └─► Check Price vs Moving Averages
+  │       ├─► Price > SMA20? → "ABOVE SHORT-TERM MA"
+  │       └─► Price < SMA20? → "BELOW SHORT-TERM MA"
+  │
+  ├─► MOMENTUM ANALYSIS (7 signals)
+  │   ├─► RSI Analysis
+  │   │   ├─► RSI > 70? → "RSI OVERBOUGHT"
+  │   │   ├─► RSI < 30? → "RSI OVERSOLD"
+  │   │   └─► 40 < RSI < 60? → "RSI NEUTRAL"
+  │   │
+  │   ├─► MACD Analysis
+  │   │   ├─► MACD crossed above Signal? → "MACD BULLISH CROSS"
+  │   │   ├─► MACD crossed below Signal? → "MACD BEARISH CROSS"
+  │   │   ├─► MACD > 0 and Signal > 0? → "MACD POSITIVE"
+  │   │   └─► MACD < 0 and Signal < 0? → "MACD NEGATIVE"
+  │   │
+  │   └─► Stochastic Analysis
+  │       ├─► %K > 80? → "STOCHASTIC OVERBOUGHT"
+  │       └─► %K < 20? → "STOCHASTIC OVERSOLD"
+  │
+  ├─► VOLATILITY ANALYSIS (4 signals)
+  │   ├─► Bollinger Bands
+  │   │   ├─► Price > Upper Band? → "BB BREAKOUT ABOVE"
+  │   │   ├─► Price < Lower Band? → "BB BREAKOUT BELOW"
+  │   │   └─► Bands width < threshold? → "BB SQUEEZE"
+  │   │
+  │   └─► ATR Analysis
+  │       └─► ATR > average? → "HIGH VOLATILITY"
+  │
+  ├─► VOLUME ANALYSIS (4 signals)
+  │   ├─► Volume vs Average
+  │   │   ├─► Volume > 2x average? → "VOLUME SURGE"
+  │   │   └─► Volume < 0.5x average? → "LOW VOLUME"
+  │   │
+  │   └─► OBV Analysis
+  │       ├─► OBV trending up? → "OBV BULLISH"
+  │       └─► OBV trending down? → "OBV BEARISH"
+  │
+  ├─► Aggregate All Signals
+  │   └─► Each signal: (name, description, sentiment)
+  │
+  ├─► Calculate Signal Summary
+  │   ├─► Count BULLISH signals
+  │   ├─► Count BEARISH signals
+  │   └─► Count NEUTRAL signals
+  │
+  └─► Return Signals List
+      └─► Display in UI with color coding
+```
+
+---
+
+## 6. Sentiment Analysis Workflow
+
+```
+User Clicks "Analyze News Sentiment" Button
+  │
+  ├─► Check NEWS_AVAILABLE Flag
+  │   └─► Not available? → Show warning & return
+  │
+  ├─► Display Loading Spinner
+  │   └─► "📰 Fetching and analyzing news..."
+  │
+  ├─► Call fetch_news_articles(symbol, company_name)
+  │   │
+  │   ├─► Initialize NewsAPI Client
+  │   │
+  │   ├─► Strategy 1: Search by Company Name
+  │   │   ├─► Query: "{company_name}"
+  │   │   ├─► Language: English
+  │   │   ├─► Sort by: publishedAt
+  │   │   └─► Page size: 20
+  │   │
+  │   ├─► Strategy 2: Search by Ticker Symbol
+  │   │   └─► Query: "{symbol}"
+  │   │
+  │   ├─► Combine & Deduplicate Articles
+  │   │   └─► Remove duplicates by URL
+  │   │
+  │   └─► Return Top 20 Valid Articles
+  │
+  ├─► Call calculate_sentiment_metrics(articles)
+  │   │
+  │   ├─► For Each Article:
+  │   │   ├─► Extract title + description
+  │   │   ├─► Call analyze_sentiment_score(text)
+  │   │   │   └─► VADER SentimentIntensityAnalyzer
+  │   │   │       └─► Returns compound score (-1 to +1)
+  │   │   │
+  │   │   ├─► Classify Sentiment
+  │   │   │   ├─► Score > 0.05? → Positive
+  │   │   │   ├─► Score < -0.05? → Negative
+  │   │   │   └─► Otherwise → Neutral
+  │   │   │
+  │   │   └─► Store: {title, source, published, sentiment, url}
+  │   │
+  │   ├─► Calculate Aggregate Metrics
+  │   │   ├─► Average sentiment
+  │   │   ├─► Standard deviation
+  │   │   ├─► Positive/Negative/Neutral counts
+  │   │   └─► Sentiment trend (recent vs older)
+  │   │
+  │   └─► Determine Sentiment Strength
+  │       ├─► |avg| > 0.3? → "VERY POSITIVE/NEGATIVE"
+  │       ├─► |avg| > 0.15? → "POSITIVE/NEGATIVE"
+  │       └─► Otherwise → "NEUTRAL"
+  │
+  ├─► Call generate_sentiment_recommendation()
+  │   ├─► avg > 0.3 & strength = "VERY POSITIVE"? → "STRONG BUY"
+  │   ├─► avg > 0.15? → "BUY"
+  │   ├─► avg > 0.05? → "WEAK BUY"
+  │   ├─► avg < -0.3 & strength = "VERY NEGATIVE"? → "STRONG SELL"
+  │   ├─► avg < -0.15? → "SELL"
+  │   ├─► avg < -0.05? → "WEAK SELL"
+  │   └─► Otherwise → "HOLD"
+  │
+  ├─► Display Results
+  │   ├─► Main Recommendation Card (Buy/Sell/Hold)
+  │   ├─► Sentiment Metrics (avg, strength, counts)
+  │   ├─► Visualizations
+  │   │   ├─► Sentiment Distribution Histogram
+  │   │   └─► Sentiment Timeline Chart
+  │   ├─► Top 20 News Articles
+  │   │   └─► Sorted by: Sentiment Impact / Date / All
+  │   └─► Trading Strategy Suggestions
+  │
+  └─► Calculate Confidence Score
+      ├─► Article count factor (15+ = high)
+      ├─► Sentiment strength factor
+      ├─► Consistency factor (low std dev)
+      └─► Trend clarity factor
+```
+
+---
+
+## 7. Risk Metrics Calculation
+
+```
+Input: DataFrame with Price Data
+  │
+  ├─► Calculate Daily Returns
+  │   └─► returns = Close.pct_change().dropna()
+  │
+  ├─► Check QuantStats Availability
+  │   │
+  │   ├─► AVAILABLE → Use QuantStats Functions
+  │   │   ├─► Sharpe Ratio: qs.stats.sharpe(returns)
+  │   │   ├─► Sortino Ratio: qs.stats.sortino(returns)
+  │   │   ├─► Max Drawdown: qs.stats.max_drawdown(returns)
+  │   │   └─► Calmar Ratio: qs.stats.calmar(returns)
+  │   │
+  │   └─► NOT AVAILABLE → Manual Calculations
+  │       ├─► Sharpe Ratio
+  │       │   └─► (mean_return * 252) / (std_return * sqrt(252))
+  │       │
+  │       ├─► Sortino Ratio
+  │       │   ├─► Downside returns = returns[returns < 0]
+  │       │   └─► mean_return / downside_std
+  │       │
+  │       ├─► Max Drawdown
+  │       │   ├─► Cumulative returns
+  │       │   ├─► Running maximum
+  │       │   └─► Max of (cum_return - running_max)
+  │       │
+  │       └─► Calmar Ratio
+  │           └─► Annualized return / |max_drawdown|
+  │
+  ├─► Calculate Additional Metrics
+  │   ├─► Volatility (Annualized)
+  │   │   └─► std(returns) * sqrt(252)
+  │   │
+  │   ├─► Value at Risk (95%)
+  │   │   └─► 5th percentile of returns
+  │   │
+  │   └─► Win Rate
+  │       └─► Count(positive returns) / Total returns
+  │
+  ├─► Package Results into Dictionary
+  │   └─► {sharpe, sortino, max_drawdown, volatility, var_95, calmar, win_rate}
+  │
+  ├─► Display Metrics in UI
+  │   ├─► Row 1: Sharpe, Sortino, Max DD, Volatility
+  │   └─► Row 2: VaR, Calmar, Win Rate
+  │
+  └─► Generate Risk Assessment
+      ├─► Sharpe > 1? → "Good risk-adjusted returns"
+      ├─► Max DD > 20%? → "High drawdown risk"
+      └─► Display colored alerts
+```
+
+---
+
+## 8. Stock Comparison Process
+
+```
+User Enters Symbols: "MSFT,GOOGL,TSLA,NVDA"
+  │
+  ├─► Parse Input
+  │   ├─► Split by comma
+  │   ├─► Strip whitespace
+  │   └─► Convert to uppercase
+  │
+  ├─► Validate Input
+  │   ├─► Less than 2 symbols? → Show warning
+  │   ├─► More than 10 symbols? → Show warning
+  │   └─► Valid count? → Continue
+  │
+  ├─► Display Loading Spinner
+  │   └─► "Fetching data for {n} stocks..."
+  │
+  ├─► Call fetch_multiple_stocks(symbols, period)
+  │   │
+  │   ├─► For Each Symbol:
+  │   │   ├─► Create yf.Ticker(symbol)
+  │   │   ├─► Fetch history(period)
+  │   │   ├─► Fetch info dictionary
+  │   │   │
+  │   │   └─► Store Data:
+  │   │       ├─► history: DataFrame
+  │   │       ├─► current_price
+  │   │       ├─► name, sector, industry
+  │   │       ├─► market_cap, pe_ratio, beta
+  │   │       └─► dividend_yield, margins, growth
+  │   │
+  │   └─► Return: {symbol: data_dict}
+  │
+  ├─► Create Normalized Price Chart
+  │   ├─► For each stock:
+  │   │   └─► Normalize: (price / first_price) * 100
+  │   │
+  │   └─► Plot all on same chart (base = 100)
+  │
+  ├─► Calculate Comparison Metrics
+  │   │
+  │   ├─► For Each Stock:
+  │   │   ├─► Calculate Returns
+  │   │   │   ├─► 1-month return
+  │   │   │   ├─► 3-month return
+  │   │   │   └─► 1-year return
+  │   │   │
+  │   │   ├─► Calculate Volatility
+  │   │   │   └─► Annualized std deviation
+  │   │   │
+  │   │   ├─► Calculate RSI
+  │   │   │   └─► 14-period RSI
+  │   │   │
+  │   │   └─► Calculate Relative Strength
+  │   │       ├─► Fetch S&P 500 data
+  │   │       └─► Stock return - S&P return
+  │   │
+  │   └─► Create Comparison DataFrame
+  │       └─► Columns: Symbol, Name, Price, Market Cap, P/E, Beta,
+  │           Div Yield, Returns, Volatility, RSI, Rel Strength, Sector
+  │
+  ├─► Display Results
+  │   ├─► Normalized price chart
+  │   ├─► Detailed metrics table
+  │   └─► Download CSV button
+  │
+  ├─► Generate Key Insights
+  │   ├─► Best 1Y return
+  │   ├─► Lowest volatility
+  │   └─► Best relative strength
+  │
+  └─► Show Sector Distribution
+      └─► Pie chart of stocks by sector
+```
+
+---
+
+## 9. Stock Screener Flow
+
+```
+User Sets Screening Criteria
+  │
+  ├─► Price Range
+  │   ├─► Min Price: $0
+  │   └─► Max Price: $10,000
+  │
+  ├─► Market Cap
+  │   └─► Select: Any / Micro / Small / Mid / Large / Mega
+  │
+  ├─► Other Filters
+  │   ├─► Max P/E Ratio
+  │   └─► Min Volume
+  │
+  └─► Sector Filter (Optional)
+      └─► Multi-select from 11 sectors
+  │
+  ├─► User Clicks "Run Screener"
+  │
+  ├─► Display Loading Spinner
+  │   └─► "Screening stocks... This may take a minute..."
+  │
+  ├─► Call stock_screener(filters)
+  │   │
+  │   ├─► Define Stock Universe (70+ stocks)
+  │   │   └─► AAPL, MSFT, GOOGL, AMZN, TSLA, META, NVDA, etc.
+  │   │
+  │   ├─► For Each Stock in Universe:
+  │   │   │
+  │   │   ├─► Fetch Data
+  │   │   │   ├─► ticker.info
+  │   │   │   └─► ticker.history(5d)
+  │   │   │
+  │   │   ├─► Extract Metrics
+  │   │   │   ├─► Current price
+  │   │   │   ├─► Market cap
+  │   │   │   ├─► P/E ratio
+  │   │   │   ├─► Volume
+  │   │   │   └─► Sector
+  │   │   │
+  │   │   ├─► Apply Filters
+  │   │   │   ├─► Price in range? → Continue
+  │   │   │   ├─► Market cap >= min? → Continue
+  │   │   │   ├─► P/E <= max? → Continue
+  │   │   │   ├─► Volume >= min? → Continue
+  │   │   │   └─► Sector matches? → Continue
+  │   │   │
+  │   │   ├─► Calculate Additional Metrics
+  │   │   │   └─► Daily change %
+  │   │   │
+  │   │   └─► Add to Results
+  │   │       └─► {Symbol, Name, Price, Change%, Market Cap, P/E, Volume, Sector, Industry}
+  │   │
+  │   └─► Return Results DataFrame
+  │
+  ├─► Display Results
+  │   ├─► Success message: "Found {n} stocks"
+  │   ├─► Results table (formatted)
+  │   └─► Download CSV button
+  │
+  ├─► Show Quick Statistics
+  │   ├─► Total stocks found
+  │   ├─► Average price
+  │   ├─► Average change %
+  │   └─► Number of sectors
+  │
+  └─► Visualize Sector Breakdown
+      └─► Bar chart: Stocks by sector
+```
+
+---
+
+## 10. User Interaction Flow
+
+```
+USER OPENS APPLICATION (http://localhost:8501)
+  │
+  ├─► Page Loads
+  │   ├─► Display header with gradient title
+  │   ├─► Show subtitle
+  │   └─► Render sidebar with default values
+  │
+  ├─► SIDEBAR INTERACTIONS
+  │   │
+  │   ├─► User Changes Stock Symbol
+  │   │   └─► Trigger: Re-fetch data → Recalculate everything
+  │   │
+  │   ├─► User Changes Period/Interval
+  │   │   ├─► Validate combination
+  │   │   ├─► Show warning if needed
+  │   │   └─► Trigger: Re-fetch data
+  │   │
+  │   └─► User Toggles Options
+  │       ├─► Show Volume → Update chart
+  │       ├─► Trading Signals → Show/hide signals
+  │       └─► Risk Metrics → Show/hide risk analysis
+  │
+  ├─► TAB NAVIGATION
+  │   │
+  │   ├─► Tab 1: Chart Analysis
+  │   │   ├─► Display professional candlestick chart
+  │   │   ├─► Show volume bars (if enabled)
+  │   │   ├─► Overlay technical indicators
+  │   │   └─► Display key price levels
+  │   │
+  │   ├─► Tab 2: Trading Signals
+  │   │   ├─► Generate 20+ signals
+  │   │   ├─► Display with color coding
+  │   │   ├─► Show signal summary
+  │   │   └─► Overall recommendation
+  │   │
+  │   ├─► Tab 3: Technical Indicators
+  │   │   ├─► Show trend indicators table
+  │   │   ├─► Show momentum indicators table
+  │   │   └─► Show Bollinger Bands values
+  │   │
+  │   ├─► Tab 4: Sentiment Analysis
+  │   │   ├─► User clicks "Analyze" button
+  │   │   ├─► Fetch 20 news articles
+  │   │   ├─► Calculate sentiment scores
+  │   │   ├─► Display recommendation
+  │   │   ├─► Show visualizations
+  │   │   └─► List all articles
+  │   │
+  │   ├─► Tab 5: Risk Analysis
+  │   │   ├─► Calculate risk metrics
+  │   │   ├─► Display in metric cards
+  │   │   └─► Show risk assessment
+  │   │
+  │   ├─► Tab 6: Performance Metrics
+  │   │   ├─► Calculate returns
+  │   │   ├─► Show returns distribution chart
+  │   │   └─► Show cumulative returns chart
+  │   │
+  │   ├─► Tab 7: Quantitative Analysis
+  │   │   ├─► Display statistical measures
+  │   │   └─► Display volume analysis
+  │   │
+  │   ├─► Tab 8: Market Overview
+  │   │   ├─► Fetch major indices
+  │   │   ├─► Fetch sector performance
+  │   │   ├─► Fetch top movers
+  │   │   └─► Display heatmaps and tables
+  │   │
+  │   ├─► Tab 9: Stock Comparison
+  │   │   ├─► User enters symbols
+  │   │   ├─► User selects period
+  │   │   ├─► User clicks "Compare"
+  │   │   ├─► Fetch data for all stocks
+  │   │   ├─► Display normalized chart
+  │   │   ├─► Show metrics table
+  │   │   └─► Highlight key insights
+  │   │
+  │   └─► Tab 10: Stock Screener
+  │       ├─► User sets filter criteria
+  │       ├─► User clicks "Run Screener"
+  │       ├─► Screen 70+ stocks
+  │       ├─► Display results table
+  │       ├─► Show statistics
+  │       └─► Visualize sector breakdown
+  │
+  ├─► DATA CACHING
+  │   ├─► fetch_professional_data: 1 hour TTL
+  │   ├─► fetch_market_indices: 5 minutes TTL
+  │   ├─► fetch_sector_performance: 5 minutes TTL
+  │   ├─► fetch_top_movers: 5 minutes TTL
+  │   └─► fetch_multiple_stocks: 10 minutes TTL
+  │
+  └─► ERROR HANDLING
+      ├─► Data fetch fails → Show error message
+      ├─► Invalid symbol → Show warning
+      ├─► API rate limit → Show info message
+      ├─► Library missing → Show warning with install instructions
+      └─► General error → Show error with traceback in expander
+```
+
+---
+
+## Data Flow Diagram
+
+```
+┌──────────────┐
+│     USER     │
+└──────┬───────┘
+       │
+       ├─► Enters Symbol
+       ├─► Selects Period/Interval
+       └─► Enables Options
+       │
+       ▼
+┌──────────────────────────────────────┐
+│      STREAMLIT APPLICATION           │
+│  ┌────────────────────────────────┐  │
+│  │  1. Validate Input             │  │
+│  │  2. Fetch Data (yfinance)      │  │
+│  │  3. Calculate Indicators       │  │
+│  │  4. Generate Signals           │  │
+│  │  5. Create Visualizations      │  │
+│  └────────────────────────────────┘  │
+└──────────────┬───────────────────────┘
+               │
+       ┌───────┴───────┐
+       │               │
+       ▼               ▼
+┌─────────────┐  ┌─────────────┐
+│  Yahoo      │  │  NewsAPI    │
+│  Finance    │  │             │
+└─────────────┘  └─────────────┘
+       │               │
+       └───────┬───────┘
+               │
+               ▼
+       ┌───────────────┐
+       │  Raw Data     │
+       │  - OHLCV      │
+       │  - News       │
+       │  - Company    │
+       └───────┬───────┘
+               │
+               ▼
+       ┌───────────────────┐
+       │  Processing       │
+       │  - pandas-ta      │
+       │  - VADER          │
+       │  - QuantStats     │
+       └───────┬───────────┘
+               │
+               ▼
+       ┌───────────────────┐
+       │  Analyzed Data    │
+       │  - Indicators     │
+       │  - Signals        │
+       │  - Sentiment      │
+       │  - Risk Metrics   │
+       └───────┬───────────┘
+               │
+               ▼
+       ┌───────────────────┐
+       │  Visualization    │
+       │  - Plotly Charts  │
+       │  - Tables         │
+       │  - Metrics Cards  │
+       └───────┬───────────┘
+               │
+               ▼
+       ┌───────────────────┐
+       │  USER INTERFACE   │
+       │  (Browser)        │
+       └───────────────────┘
+```
+
+---
+
+## Component Interaction Matrix
+
+```
+┌─────────────────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┐
+│                 │Chart │Signal│Tech  │Senti │Risk  │Perf  │Screen│
+│                 │Anal  │Gen   │Indic │Anal  │Anal  │Metr  │er    │
+├─────────────────┼──────┼──────┼──────┼──────┼──────┼──────┼──────┤
+│ Data Fetcher    │  ✓   │  ✓   │  ✓   │  ✓   │  ✓   │  ✓   │  ✓   │
+├─────────────────┼──────┼──────┼──────┼──────┼──────┼──────┼──────┤
+│ Indicator Calc  │  ✓   │  ✓   │  ✓   │  -   │  -   │  -   │  -   │
+├─────────────────┼──────┼──────┼──────┼──────┼──────┼──────┼──────┤
+│ Signal Gen      │  -   │  ✓   │  -   │  -   │  -   │  -   │  -   │
+├─────────────────┼──────┼──────┼──────┼──────┼──────┼──────┼──────┤
+│ News Fetcher    │  -   │  -   │  -   │  ✓   │  -   │  -   │  -   │
+├─────────────────┼──────┼──────┼──────┼──────┼──────┼──────┼──────┤
+│ Sentiment Calc  │  -   │  -   │  -   │  ✓   │  -   │  -   │  -   │
+├─────────────────┼──────┼──────┼──────┼──────┼──────┼──────┼──────┤
+│ Risk Calculator │  -   │  -   │  -   │  -   │  ✓   │  -   │  -   │
+├─────────────────┼──────┼──────┼──────┼──────┼──────┼──────┼──────┤
+│ Returns Calc    │  -   │  -   │  -   │  -   │  ✓   │  ✓   │  -   │
+├─────────────────┼──────┼──────┼──────┼──────┼──────┼──────┼──────┤
+│ Plotly Charts   │  ✓   │  -   │  -   │  ✓   │  -   │  ✓   │  ✓   │
+├─────────────────┼──────┼──────┼──────┼──────┼──────┼──────┼──────┤
+│ Cache System    │  ✓   │  ✓   │  ✓   │  ✓   │  ✓   │  ✓   │  ✓   │
+└─────────────────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┘
+
+Legend: ✓ = Used, - = Not Used
+```
+
+---
+
+## Performance Optimization Flow
+
+```
+User Request
+  │
+  ├─► Check Cache
+  │   │
+  │   ├─► Cache Hit?
+  │   │   └─► YES → Return cached data (Fast!)
+  │   │
+  │   └─► Cache Miss?
+  │       └─► NO → Fetch fresh data
+  │           │
+  │           ├─► Store in cache with TTL
+  │           │   ├─► Market data: 5 min TTL
+  │           │   ├─► Stock data: 1 hour TTL
+  │           │   └─► Comparison: 10 min TTL
+  │           │
+  │           └─► Return data
+  │
+  ├─► Lazy Loading
+  │   ├─► Only fetch when tab is accessed
+  │   ├─► Sentiment: Only when button clicked
+  │   └─► Screener: Only when "Run" clicked
+  │
+  └─► Efficient Calculations
+      ├─► Use pandas-ta when available (faster)
+      ├─► Vectorized operations (no loops)
+      └─► Pre-calculate common metrics
+```
+
+---
+
+## Error Handling Strategy
+
+```
+Every Function Call
+  │
+  ├─► Wrapped in try-except
+  │
+  ├─► Error Occurs?
+  │   │
+  │   ├─► Log Error (optional)
+  │   │
+  │   ├─► Display User-Friendly Message
+  │   │   ├─► st.error() for critical errors
+  │   │   ├─► st.warning() for warnings
+  │   │   └─► st.info() for information
+  │   │
+  │   ├─► Provide Fallback
+  │   │   ├─► Return empty DataFrame
+  │   │   ├─► Return default values
+  │   │   └─► Skip optional features
+  │   │
+  │   └─► Show Traceback (in expander)
+  │       └─► For debugging purposes
+  │
+  └─► Success?
+      └─► Continue normal flow
+```
+
+---
+
+## Summary
+
+This document provides comprehensive flowcharts and diagrams explaining:
+
+1. **System Architecture** - Overall structure and component relationships
+2. **Application Flow** - From startup to user interaction
+3. **Data Processing** - How data flows through the system
+4. **Feature Workflows** - Detailed flows for each major feature
+5. **Optimization** - Caching and performance strategies
+6. **Error Handling** - Robust error management approach
+
+Each flowchart uses ASCII art for maximum compatibility and clarity. The diagrams show the logical flow of operations, decision points, and data transformations throughout the application.
+
+---
+
+**End of Document**

@@ -1,0 +1,17 @@
+streamlit
+pandas
+numpy
+yfinance
+statsmodels
+plotly
+scikit-learn
+newsapi-python
+beautifulsoup4
+vaderSentiment
+requests
+ta
+quantstats
+pandas-ta
+pyfolio-reloaded
+mplfinance
+python-dotenv
